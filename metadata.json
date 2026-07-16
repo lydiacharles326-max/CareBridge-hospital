@@ -1,0 +1,6 @@
+{
+  "name": "CareBridge Hospital",
+  "description": "Bridging Care. Building Healthier Lives. Experience premium, compassionate, and world-class healthcare at CareBridge Hospital.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
