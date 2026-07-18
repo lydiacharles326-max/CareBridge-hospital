@@ -4,6 +4,50 @@ import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { getDb, getUsersCollection, getAppointmentsCollection } from './server/mongodb.js';
 
+// Global Console Interceptor for Vercel Log Visibility
+const logsBuffer: string[] = [];
+const maxLogs = 1000;
+
+function addLog(type: 'INFO' | 'WARN' | 'ERROR', ...args: any[]) {
+  const timestamp = new Date().toISOString();
+  const msg = args.map(arg => {
+    if (typeof arg === 'object') {
+      try {
+        return JSON.stringify(arg);
+      } catch (e) {
+        return String(arg);
+      }
+    }
+    return String(arg);
+  }).join(' ');
+  const line = `[${timestamp}] [${type}] ${msg}`;
+  logsBuffer.push(line);
+  if (logsBuffer.length > maxLogs) {
+    logsBuffer.shift();
+  }
+}
+
+const originalLog = console.log;
+const originalWarn = console.warn;
+const originalError = console.error;
+
+console.log = (...args: any[]) => {
+  addLog('INFO', ...args);
+  originalLog(...args);
+};
+
+console.warn = (...args: any[]) => {
+  addLog('WARN', ...args);
+  originalWarn(...args);
+};
+
+console.error = (...args: any[]) => {
+  addLog('ERROR', ...args);
+  originalError(...args);
+};
+
+console.log('🚀 Real-Time Console Interceptor activated in CareBridge backend!');
+
 const app = express();
 const PORT = 3000;
 
@@ -208,6 +252,22 @@ app.get('/api/db-status', async (req, res) => {
     mongodbUriConfigured: !!process.env.MONGODB_URI,
     googleClientConfigured: !!process.env.GOOGLE_CLIENT_ID
   });
+});
+
+// 📊 API Endpoints: Developer Logs Monitor for Vercel
+app.get('/api/logs', (req, res) => {
+  res.json({ logs: logsBuffer });
+});
+
+app.post('/api/logs/test', (req, res) => {
+  console.log('🧪 Diagnostic Ping: Backend server is active on Vercel Node.js runtime.');
+  res.json({ success: true, message: 'Diagnostic log inserted.' });
+});
+
+app.post('/api/logs/clear', (req, res) => {
+  logsBuffer.length = 0;
+  console.log('🧹 Vercel logs buffer cleared by executive system administrator.');
+  res.json({ success: true, message: 'Logs buffer cleared.' });
 });
 
 // 🔑 API Endpoints: AUTHENTICATION

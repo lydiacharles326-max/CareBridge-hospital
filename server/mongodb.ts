@@ -7,7 +7,12 @@ let client: MongoClient | null = null;
 let dbInstance: Db | null = null;
 let isMockDb = false;
 
-const localDbPath = path.join(process.cwd(), 'dist', 'local_db.json');
+const isVercel = !!process.env.VERCEL || process.env.NODE_ENV === 'production';
+const localDbPath = isVercel
+  ? path.join('/tmp', 'local_db.json')
+  : path.join(process.cwd(), 'dist', 'local_db.json');
+
+console.log(`📂 Clinical sandbox filesystem active at: ${localDbPath}`);
 
 // Ensure the directory exists
 function ensureLocalDbFile() {
@@ -42,6 +47,10 @@ function writeLocalDb(data: any) {
   }
 }
 
+let lastConnectAttempt = 0;
+let connectionFailedRecently = false;
+const RETRY_COOLDOWN_MS = 15000; // 15 seconds
+
 export async function getDb() {
   if (dbInstance) {
     return { db: dbInstance, isMock: isMockDb };
@@ -50,28 +59,41 @@ export async function getDb() {
   const uri = process.env.MONGODB_URI;
 
   if (!uri) {
-    console.warn('⚠️ MONGODB_URI not provided. Falling back to a file-based JSON database.');
+    if (!isMockDb) {
+      console.warn('⚠️ MONGODB_URI not provided. Falling back to a file-based JSON database.');
+      isMockDb = true;
+    }
+    return { db: null, isMock: true };
+  }
+
+  const now = Date.now();
+  if (connectionFailedRecently && (now - lastConnectAttempt) < RETRY_COOLDOWN_MS) {
+    // Return mock database immediately without waiting for timeout to keep the app blazing fast
     isMockDb = true;
     return { db: null, isMock: true };
   }
 
   try {
+    lastConnectAttempt = now;
     if (!client) {
       client = new MongoClient(uri, {
-        serverSelectionTimeoutMS: 4000,
-        connectTimeoutMS: 4000,
+        serverSelectionTimeoutMS: 2500, // Reduced to 2.5s for snappy failure detection on serverless
+        connectTimeoutMS: 2500,
       });
     }
     await client.connect();
     dbInstance = client.db();
     isMockDb = false;
+    connectionFailedRecently = false;
     console.log('🔌 Successfully connected to MongoDB database!');
     return { db: dbInstance, isMock: false };
   } catch (error) {
     console.error('❌ Failed to connect to MongoDB. Falling back to a file-based JSON database.', error);
+    console.warn('💡 TIP: If this is running on Vercel, make sure you whitelisted "Allow Access From Anywhere" (0.0.0.0/0) in your MongoDB Atlas Network Access console.');
     client = null;
     dbInstance = null;
     isMockDb = true;
+    connectionFailedRecently = true;
     return { db: null, isMock: true };
   }
 }
