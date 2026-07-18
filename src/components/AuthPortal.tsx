@@ -369,7 +369,18 @@ export default function AuthPortal({ isOpen, onClose, onNavigateToBooking }: Aut
 
           {/* Footer licensing tag */}
           <div className="px-6 py-3.5 bg-gray-50 border-t border-gray-100 shrink-0 text-center flex flex-col sm:flex-row justify-between items-center gap-2 text-gray-400 font-mono text-[10px]">
-            <span>© CAREBRIDGE DIGITAL CLINICS • {dbStatus ? `ACTIVE ENGINE: ${dbStatus.provider}` : 'CONNECTING TO CLINICAL SERVER...'}</span>
+            <div className="flex items-center justify-center gap-2">
+              <span className={`relative flex h-1.5 w-1.5 rounded-full ${
+                !dbStatus ? 'bg-gray-400' : dbStatus.provider === 'MongoDB Atlas Cloud' ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500 animate-pulse'
+              }`}>
+                {dbStatus && (
+                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                    dbStatus.provider === 'MongoDB Atlas Cloud' ? 'bg-emerald-400' : 'bg-amber-400'
+                  }`}></span>
+                )}
+              </span>
+              <span>© CAREBRIDGE DIGITAL CLINICS • {dbStatus ? `ACTIVE ENGINE: ${dbStatus.provider}` : 'CONNECTING TO CLINICAL SERVER...'}</span>
+            </div>
             <span>🔒 LOCAL CACHE AND STATE IS HIPPA ENCRYPTED</span>
           </div>
         </div>

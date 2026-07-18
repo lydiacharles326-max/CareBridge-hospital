@@ -17,40 +17,182 @@ function getAppUrl(req: express.Request): string {
   return `${req.protocol}://${req.get('host')}`;
 }
 
-// Helper to seed default users and purge mock staff
+// Helper to seed default users and purge legacy mock staff
 async function seedDefaultUsers() {
   try {
     const usersColl = await getUsersCollection();
 
-    // Actively delete existing mock staff/patient accounts from the database
-    const mockIds = ['usr-doctor', 'usr-nurse', 'usr-pharmacist', 'usr-lab', 'usr-receptionist', 'usr-patient'];
-    console.log('🧹 Purging any legacy mock staff and patients from the database...');
+    // Actively delete legacy mock staff/patient accounts from the database to avoid ID collision
+    const mockIds = ['usr-doctor', 'usr-nurse', 'usr-pharmacist', 'usr-lab', 'usr-receptionist', 'usr-patient', 'usr-admin', 'usr-doctor-chinedu', 'usr-doctor-elena', 'usr-doctor-marcus', 'usr-doctor-sarah', 'usr-doctor-emade'];
+    console.log('🧹 Purging legacy mock ids to prepare modern database schemas...');
     for (const mockId of mockIds) {
       await usersColl.deleteMany({ 'user.id': mockId });
     }
 
-    // Actively remove Chief Admin Audu from the database if he exists
-    console.log('🧹 Removing Chief Admin Audu from database if present...');
-    await usersColl.deleteMany({ 'user.name': 'Chief Admin Audu' });
-    await usersColl.deleteMany({ 'user.id': 'usr-admin' });
+    // Actively remove non-Nigerian doctors to re-seed them as Black Nigerians
+    console.log('🧹 Purging old non-Nigerian doctor profiles to respect user request...');
+    await usersColl.deleteMany({ 'user.email': 'doctor.elena@carebridge.com' });
+    await usersColl.deleteMany({ 'user.email': 'doctor.marcus@carebridge.com' });
+    await usersColl.deleteMany({ 'user.email': 'doctor.sarah@carebridge.com' });
 
     const existing = await usersColl.find();
-    // Check if there is an admin with email admin@carebridge.com
-    const adminExists = existing.some((u: any) => u.user.email === 'admin@carebridge.com');
-    if (!adminExists) {
-      console.log('🌱 Seeding James Anini as the chief admin...');
-      const nowStr = new Date().toISOString();
-      const defaultUsers = [
-        {
-          user: { id: 'usr-admin', name: 'James Anini', email: 'admin@carebridge.com', role: 'admin', createdAt: nowStr },
-          password: 'password123'
-        }
-      ];
+    const existingEmails = new Set(existing.map((u: any) => u.user.email?.toLowerCase().trim()));
 
-      for (const item of defaultUsers) {
-        await usersColl.insertOne(item);
+    const defaultUsers = [
+      // 1. Admin
+      {
+        user: {
+          id: 'usr-admin-james',
+          name: 'James Anini',
+          email: 'admin@carebridge.com',
+          role: 'admin',
+          createdAt: new Date().toISOString()
+        },
+        password: 'password123'
+      },
+      // 2. Doctors (All Black Nigerians as requested, including Dr. Emade Sunday)
+      {
+        user: {
+          id: 'usr-doctor-chinedu',
+          name: 'Dr. Chinedu Okafor',
+          email: 'doctor.chinedu@carebridge.com',
+          role: 'doctor',
+          department: 'Cardiology',
+          createdAt: new Date().toISOString()
+        },
+        password: 'password123'
+      },
+      {
+        user: {
+          id: 'usr-doctor-emade',
+          name: 'Dr. Emade Sunday',
+          email: 'doctor.emade@carebridge.com',
+          role: 'doctor',
+          department: 'Pediatrics',
+          createdAt: new Date().toISOString()
+        },
+        password: 'password123'
+      },
+      {
+        user: {
+          id: 'usr-doctor-marcus',
+          name: 'Dr. Babatunde Balogun',
+          email: 'doctor.marcus@carebridge.com',
+          role: 'doctor',
+          department: 'Neurology',
+          createdAt: new Date().toISOString()
+        },
+        password: 'password123'
+      },
+      {
+        user: {
+          id: 'usr-doctor-sarah',
+          name: 'Dr. Funmilayo Adebayo',
+          email: 'doctor.sarah@carebridge.com',
+          role: 'doctor',
+          department: 'Obstetrics & Gynecology',
+          createdAt: new Date().toISOString()
+        },
+        password: 'password123'
+      },
+      // 3. Nurses
+      {
+        user: {
+          id: 'usr-nurse-clara',
+          name: 'Nurse Clara Barton',
+          email: 'nurse.clara@carebridge.com',
+          role: 'nurse',
+          department: 'Primary Care',
+          createdAt: new Date().toISOString()
+        },
+        password: 'password123'
+      },
+      {
+        user: {
+          id: 'usr-nurse-jane',
+          name: 'Nurse Jane Doe',
+          email: 'nurse.jane@carebridge.com',
+          role: 'nurse',
+          department: 'Emergency Care',
+          createdAt: new Date().toISOString()
+        },
+        password: 'password123'
+      },
+      // 4. Pharmacists
+      {
+        user: {
+          id: 'usr-pharmacist-george',
+          name: 'Pharmacist George',
+          email: 'pharmacist@carebridge.com',
+          role: 'pharmacist',
+          department: 'Clinical Pharmacy',
+          createdAt: new Date().toISOString()
+        },
+        password: 'password123'
+      },
+      // 5. Lab Technicians
+      {
+        user: {
+          id: 'usr-lab-sarah',
+          name: 'Lab Tech Sarah',
+          email: 'lab@carebridge.com',
+          role: 'lab',
+          department: 'Pathology & Labs',
+          createdAt: new Date().toISOString()
+        },
+        password: 'password123'
+      },
+      // 6. Receptionists
+      {
+        user: {
+          id: 'usr-receptionist-blessing',
+          name: 'Receptionist Blessing',
+          email: 'receptionist@carebridge.com',
+          role: 'receptionist',
+          department: 'Front Desk & Triage',
+          createdAt: new Date().toISOString()
+        },
+        password: 'password123'
+      },
+      // 7. Patients
+      {
+        user: {
+          id: 'usr-patient-john',
+          name: 'John Doe',
+          email: 'patient@carebridge.com',
+          role: 'patient',
+          phone: '+234 801 234 5678',
+          createdAt: new Date().toISOString()
+        },
+        password: 'password123'
+      },
+      {
+        user: {
+          id: 'usr-patient-jane',
+          name: 'Jane Smith',
+          email: 'patient.jane@carebridge.com',
+          role: 'patient',
+          phone: '+234 802 345 6789',
+          createdAt: new Date().toISOString()
+        },
+        password: 'password123'
       }
-      console.log('✅ Seeding complete.');
+    ];
+
+    console.log('🌱 Checking database to seed missing standard clinical accounts...');
+    let seededCount = 0;
+    for (const item of defaultUsers) {
+      const emailNorm = item.user.email.toLowerCase().trim();
+      if (!existingEmails.has(emailNorm)) {
+        await usersColl.insertOne(item);
+        seededCount++;
+      }
+    }
+    
+    if (seededCount > 0) {
+      console.log(`✅ Seeding complete. Successfully registered ${seededCount} clinical accounts to database.`);
+    } else {
+      console.log('👍 All default clinical accounts already exist in the database.');
     }
   } catch (error) {
     console.error('Error seeding default users:', error);

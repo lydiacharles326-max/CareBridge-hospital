@@ -22,7 +22,23 @@ export default function AppointmentForm({
   onOpenPortal,
   onBackToHome
 }: AppointmentFormProps) {
-  const { users } = useAuth();
+  const { currentUser, users } = useAuth();
+  
+  // Helper to match doctor departments to service/department titles using partial words/prefixes
+  const matchDepartment = (docDept: string, targetDept: string) => {
+    if (!docDept || !targetDept) return false;
+    const d = docDept.toLowerCase();
+    const t = targetDept.toLowerCase();
+    
+    // Clean strings and extract prefixes
+    const cleanD = d.replace(/[^\w\s]/g, '');
+    const cleanT = t.replace(/[^\w\s]/g, '');
+    
+    const wordsD = cleanD.split(' ').map(w => w.substring(0, 5)).filter(w => w.length >= 3);
+    const wordsT = cleanT.split(' ').map(w => w.substring(0, 5)).filter(w => w.length >= 3);
+    
+    return wordsD.some(wd => wordsT.some(wt => wd.includes(wt) || wt.includes(wd)));
+  };
   
   // Form states
   const [fullName, setFullName] = useState('');
@@ -37,6 +53,15 @@ export default function AppointmentForm({
   const [isLoading, setIsLoading] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState<Appointment | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Auto-fill logged-in patient details
+  useEffect(() => {
+    if (currentUser && currentUser.role === 'patient') {
+      setFullName(prev => prev || currentUser.name || '');
+      setEmail(prev => prev || currentUser.email || '');
+      setPhone(prev => prev || currentUser.phone || '');
+    }
+  }, [currentUser]);
 
   // Dynamic system doctors list mapping
   const systemDoctors = users
@@ -66,7 +91,7 @@ export default function AppointmentForm({
       setDepartment(selectedDept);
       
       // Filter doctors matching that department
-      const matched = activeDoctorsList.filter(doc => doc.department.toLowerCase() === selectedDept.split(' ')[0].toLowerCase());
+      const matched = activeDoctorsList.filter(doc => matchDepartment(doc.department, selectedDept));
       if (matched.length > 0) {
         setDoctor(matched[0].name);
       } else {
@@ -81,7 +106,12 @@ export default function AppointmentForm({
       // Auto fill department matching this doctor
       const match = activeDoctorsList.find(d => d.name === selectedDoc);
       if (match) {
-        setDepartment(match.department);
+        const serviceMatch = services.find(s => matchDepartment(match.department, s.title) || matchDepartment(match.department, s.department));
+        if (serviceMatch) {
+          setDepartment(serviceMatch.title);
+        } else {
+          setDepartment(match.department);
+        }
       }
     }
   }, [selectedDoc, users]);
@@ -90,8 +120,7 @@ export default function AppointmentForm({
   useEffect(() => {
     if (department) {
       // Find matches where department word overlaps
-      const deptWord = department.split(' ')[0].toLowerCase();
-      const filtered = activeDoctorsList.filter((doc) => doc.department.toLowerCase() === deptWord);
+      const filtered = activeDoctorsList.filter((doc) => matchDepartment(doc.department, department));
       setAvailableDoctors(filtered.length > 0 ? filtered : activeDoctorsList);
     } else {
       setAvailableDoctors(activeDoctorsList);
@@ -107,11 +136,11 @@ export default function AppointmentForm({
     if (!doctor) newErrors.doctor = 'Medical expert selection is required';
     if (!prefDate) newErrors.prefDate = 'Preferred appointment date is required';
     
-    // Date must be in the future
+    // Date must be in the future (with 5-min buffer leeway)
     if (prefDate) {
       const selectedDateTime = new Date(prefDate).getTime();
       const currentDateTime = new Date().getTime();
-      if (selectedDateTime <= currentDateTime) {
+      if (selectedDateTime <= currentDateTime - 5 * 60 * 1000) {
         newErrors.prefDate = 'Appointment must be scheduled for a future date';
       }
     }

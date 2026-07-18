@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Logo from './Logo';
+import { useAuth } from '../context/AuthContext';
 
 interface NavbarProps {
   onOpenPortal: () => void;
@@ -11,6 +12,7 @@ interface NavbarProps {
 export default function Navbar({ onOpenPortal, activeCount, currentPage, onPageChange }: NavbarProps) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [activeSection, setActiveSection] = useState('HOME');
+  const { dbStatus } = useAuth();
 
   const navLinks = [
     { label: 'HOME', targetId: 'home' },
@@ -79,10 +81,52 @@ export default function Navbar({ onOpenPortal, activeCount, currentPage, onPageC
         <div className="max-w-7xl mx-auto px-4 md:px-8 flex flex-col gap-3">
           {/* Top Row: Logo & Actions */}
           <div className="flex items-center justify-between w-full">
-            {/* Brand Logo */}
-            <a href="#home" onClick={(e) => handleScrollTo(e, 'home', 'HOME')} className="focus:outline-none">
-              <Logo variant="color" size={34} />
-            </a>
+            {/* Brand Logo & DB Indicator */}
+            <div className="flex items-center gap-3">
+              <a href="#home" onClick={(e) => handleScrollTo(e, 'home', 'HOME')} className="focus:outline-none">
+                <Logo variant="color" size={34} />
+              </a>
+
+              {/* MongoDB Connection Status Indicator */}
+              <div 
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[9px] font-mono font-black transition-all duration-300 ${
+                  !dbStatus 
+                    ? 'border-gray-100 bg-gray-50 text-gray-400' 
+                    : dbStatus.provider === 'MongoDB Atlas Cloud'
+                    ? 'border-emerald-100 bg-emerald-50/80 text-emerald-600'
+                    : 'border-amber-100 bg-amber-50/80 text-amber-600'
+                }`}
+                title={dbStatus ? `Database Provider: ${dbStatus.provider}` : 'Connecting to database...'}
+              >
+                {!dbStatus ? (
+                  <>
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-gray-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-gray-400"></span>
+                    </span>
+                    <span className="hidden sm:inline tracking-tight uppercase">DB CONNECTING...</span>
+                  </>
+                ) : dbStatus.provider === 'MongoDB Atlas Cloud' ? (
+                  <>
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                    </span>
+                    <span className="hidden sm:inline tracking-tight uppercase">MONGODB CONNECTED</span>
+                    <span className="sm:hidden tracking-tight uppercase">DB ONLINE</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500"></span>
+                    </span>
+                    <span className="hidden sm:inline tracking-tight uppercase">MONGODB OFFLINE</span>
+                    <span className="sm:hidden tracking-tight uppercase">DB OFFLINE</span>
+                  </>
+                )}
+              </div>
+            </div>
 
             {/* Desktop Navigation Links */}
             <div className="hidden lg:flex items-center gap-6 xl:gap-8 mx-auto">

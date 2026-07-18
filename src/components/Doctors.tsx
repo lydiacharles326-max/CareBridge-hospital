@@ -15,24 +15,39 @@ export default function Doctors({ onSelectDoctor }: DoctorsProps) {
   const systemDoctors: Doctor[] = users
     .filter((u) => u.role === 'doctor')
     .map((u, index) => {
-      // Pick a professional medical avatar placeholder based on index
-      const avatars = [
-        'https://images.unsplash.com/photo-1622253692010-333f2da6031d?q=80&w=400&auto=format&fit=crop',
-        'https://images.unsplash.com/photo-1594824813573-246434de83fb?q=80&w=400&auto=format&fit=crop',
-        'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?q=80&w=400&auto=format&fit=crop',
-        'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?q=80&w=400&auto=format&fit=crop'
-      ];
-      const avatarUrl = avatars[index % avatars.length];
+      // Pick a professional Black Nigerian medical avatar placeholder based on gender/name and index
+      let avatarUrl = '';
+      
+      const isFemale = u.name.includes('Sarah') || u.name.includes('Funmilayo') || u.name.includes('Elena') || u.name.includes('Emade');
+      
+      if (u.name.includes('Emade Sunday')) {
+        // Specific nice pediatric/general female black doctor photo for Dr. Emade Sunday
+        avatarUrl = 'https://images.unsplash.com/photo-1594824813573-246434de83fb?q=80&w=400&auto=format&fit=crop';
+      } else if (isFemale) {
+        const femaleAvatars = [
+          'https://images.unsplash.com/photo-1594824813573-246434de83fb?q=80&w=400&auto=format&fit=crop',
+          'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?q=80&w=400&auto=format&fit=crop'
+        ];
+        avatarUrl = femaleAvatars[index % femaleAvatars.length];
+      } else {
+        const maleAvatars = [
+          'https://images.unsplash.com/photo-1622253692010-333f2da6031d?q=80&w=400&auto=format&fit=crop',
+          'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?q=80&w=400&auto=format&fit=crop'
+        ];
+        avatarUrl = maleAvatars[index % maleAvatars.length];
+      }
 
       return {
         id: u.id,
         name: u.name.startsWith('Dr.') ? u.name : `Dr. ${u.name}`,
-        role: 'Specialist Physician',
+        role: u.name.includes('Sunday') ? 'Senior Consultant Pediatrician' : 'Specialist Physician',
         department: u.department || 'General Medicine',
-        experience: 'Consultant',
+        experience: u.name.includes('Sunday') ? '12 Years Experience' : 'Consultant',
         rating: 5.0,
         image: avatarUrl,
-        bio: `Dr. ${u.name.replace(/^Dr\.\s+/i, '')} is a dedicated medical specialist in the ${u.department || 'General Medicine'} department at CareBridge, providing state-of-the-art diagnostics and personalized care paths.`,
+        bio: u.name.includes('Sunday') 
+          ? `Dr. Emade Sunday is an acclaimed medical specialist in the Pediatrics department at CareBridge, known for compassionate kid-friendly treatment programs, general family wellness advising, and digital care sync.`
+          : `Dr. ${u.name.replace(/^Dr\.\s+/i, '')} is a dedicated medical specialist in the ${u.department || 'General Medicine'} department at CareBridge, providing state-of-the-art diagnostics and personalized care paths.`,
         schedule: ['Monday', 'Tuesday', 'Thursday']
       };
     });
