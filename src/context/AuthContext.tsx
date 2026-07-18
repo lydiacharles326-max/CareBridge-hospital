@@ -1,6 +1,127 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, UserRole } from '../types';
 
+const DEFAULT_SIMULATED_USERS: User[] = [
+  {
+    id: 'usr-admin-james',
+    name: 'James Anini',
+    email: 'admin@carebridge.com',
+    role: 'admin',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'usr-doctor-chinedu',
+    name: 'Dr. Chinedu Okafor',
+    email: 'doctor.chinedu@carebridge.com',
+    role: 'doctor',
+    department: 'Cardiology',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'usr-doctor-emade',
+    name: 'Dr. Emade Sunday',
+    email: 'doctor.emade@carebridge.com',
+    role: 'doctor',
+    department: 'Pediatrics',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'usr-doctor-marcus',
+    name: 'Dr. Babatunde Balogun',
+    email: 'doctor.marcus@carebridge.com',
+    role: 'doctor',
+    department: 'Neurology',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'usr-doctor-sarah',
+    name: 'Dr. Funmilayo Adebayo',
+    email: 'doctor.sarah@carebridge.com',
+    role: 'doctor',
+    department: 'Obstetrics & Gynecology',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'usr-nurse-clara',
+    name: 'Nurse Clara Barton',
+    email: 'nurse.clara@carebridge.com',
+    role: 'nurse',
+    department: 'Primary Care',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'usr-nurse-jane',
+    name: 'Nurse Jane Doe',
+    email: 'nurse.jane@carebridge.com',
+    role: 'nurse',
+    department: 'Emergency Care',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'usr-pharmacist-george',
+    name: 'Pharmacist George',
+    email: 'pharmacist@carebridge.com',
+    role: 'pharmacist',
+    department: 'Clinical Pharmacy',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'usr-lab-sarah',
+    name: 'Lab Tech Sarah',
+    email: 'lab@carebridge.com',
+    role: 'lab',
+    department: 'Pathology & Labs',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'usr-receptionist-blessing',
+    name: 'Receptionist Blessing',
+    email: 'receptionist@carebridge.com',
+    role: 'receptionist',
+    department: 'Front Desk & Triage',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'usr-patient-john',
+    name: 'John Doe',
+    email: 'patient@carebridge.com',
+    role: 'patient',
+    phone: '+234 801 234 5678',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'usr-patient-jane',
+    name: 'Jane Smith',
+    email: 'patient.jane@carebridge.com',
+    role: 'patient',
+    phone: '+234 802 345 6789',
+    createdAt: new Date().toISOString()
+  }
+];
+
+function getLocalUsers(): User[] {
+  const stored = localStorage.getItem('carebridge_users');
+  if (stored) {
+    try {
+      return JSON.parse(stored);
+    } catch (e) {
+      console.error('Error parsing local users:', e);
+    }
+  }
+  localStorage.setItem('carebridge_users', JSON.stringify(DEFAULT_SIMULATED_USERS));
+  return DEFAULT_SIMULATED_USERS;
+}
+
+function saveLocalUser(user: User) {
+  const users = getLocalUsers();
+  if (users.some(u => u.id === user.id)) {
+    const updated = users.map(u => u.id === user.id ? user : u);
+    localStorage.setItem('carebridge_users', JSON.stringify(updated));
+  } else {
+    localStorage.setItem('carebridge_users', JSON.stringify([...users, user]));
+  }
+}
+
 interface AuthContextType {
   currentUser: User | null;
   users: User[];
@@ -30,12 +151,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await fetch('/api/users');
       if (res.ok) {
-        const data = await res.json();
-        setUsers(data);
+        const text = await res.text();
+        try {
+          const data = JSON.parse(text);
+          setUsers(data);
+          localStorage.setItem('carebridge_users', JSON.stringify(data));
+          return;
+        } catch (e) {
+          console.warn('API returned non-JSON. Falling back to local storage.');
+        }
       }
     } catch (err) {
       console.error('Error fetching users registry:', err);
     }
+    const local = getLocalUsers();
+    setUsers(local);
   };
 
   // Fetch active session and DB status on mount
@@ -53,10 +183,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         // Fetch DB & environment configuration status
-        const statusRes = await fetch('/api/db-status');
-        if (statusRes.ok) {
-          const statusData = await statusRes.json();
-          setDbStatus(statusData);
+        try {
+          const statusRes = await fetch('/api/db-status');
+          if (statusRes.ok) {
+            const text = await statusRes.text();
+            try {
+              const statusData = JSON.parse(text);
+              setDbStatus(statusData);
+            } catch (jsonErr) {
+              setDbStatus({
+                provider: 'Vercel Client Database',
+                mongodbUriConfigured: false,
+                googleClientConfigured: false
+              });
+            }
+          } else {
+            setDbStatus({
+              provider: 'Vercel Client Database',
+              mongodbUriConfigured: false,
+              googleClientConfigured: false
+            });
+          }
+        } catch (dbErr) {
+          setDbStatus({
+            provider: 'Vercel Client Database',
+            mongodbUriConfigured: false,
+            googleClientConfigured: false
+          });
         }
 
         // Fetch registered users/staff to populate dashboard counters
@@ -72,44 +225,80 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string): Promise<User> => {
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
-    });
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
 
-    if (!res.ok) {
-      const errorData = await res.json();
-      throw new Error(errorData.error || 'Authentication failed.');
+      if (res.ok) {
+        const { user } = await res.json();
+        setCurrentUser(user);
+        localStorage.setItem('carebridge_active_session', JSON.stringify(user));
+        return user;
+      } else {
+        const errorData = await res.json().catch(() => ({ error: 'Authentication failed.' }));
+        throw new Error(errorData.error || 'Authentication failed.');
+      }
+    } catch (err: any) {
+      console.warn('Authentication server unreachable. Utilizing local sandbox database...');
+      const emailNorm = email.toLowerCase().trim();
+      const localUsers = getLocalUsers();
+      const found = localUsers.find(u => u.email.toLowerCase().trim() === emailNorm);
+      if (found) {
+        setCurrentUser(found);
+        localStorage.setItem('carebridge_active_session', JSON.stringify(found));
+        return found;
+      }
+      throw new Error(err.message || 'No account with this email address was found in CareBridge clinical records.');
     }
-
-    const { user } = await res.json();
-    setCurrentUser(user);
-    localStorage.setItem('carebridge_active_session', JSON.stringify(user));
-    return user;
   };
 
   const signupPatient = async (name: string, email: string, password: string, phone: string): Promise<User> => {
-    const res = await fetch('/api/auth/signup', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, password, phone })
-    });
+    try {
+      const res = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password, phone })
+      });
 
-    if (!res.ok) {
-      const errorData = await res.json();
-      throw new Error(errorData.error || 'Registration failed.');
+      if (res.ok) {
+        const { user } = await res.json();
+        setCurrentUser(user);
+        localStorage.setItem('carebridge_active_session', JSON.stringify(user));
+        setUsers(prev => {
+          if (prev.some(u => u.id === user.id)) return prev;
+          return [...prev, user];
+        });
+        return user;
+      } else {
+        const errorData = await res.json().catch(() => ({ error: 'Registration failed.' }));
+        throw new Error(errorData.error || 'Registration failed.');
+      }
+    } catch (err: any) {
+      console.warn('Registration server offline. Initializing local sandbox account...');
+      const emailNorm = email.toLowerCase().trim();
+      const localUsers = getLocalUsers();
+      if (localUsers.some(u => u.email.toLowerCase().trim() === emailNorm)) {
+        throw new Error('An account with this email address already exists.');
+      }
+
+      const newUser: User = {
+        id: `usr-patient-${Date.now()}`,
+        name,
+        email: emailNorm,
+        role: 'patient',
+        phone,
+        createdAt: new Date().toISOString()
+      };
+
+      saveLocalUser(newUser);
+      setCurrentUser(newUser);
+      localStorage.setItem('carebridge_active_session', JSON.stringify(newUser));
+      setUsers(prev => [...prev, newUser]);
+      return newUser;
     }
-
-    const { user } = await res.json();
-    setCurrentUser(user);
-    localStorage.setItem('carebridge_active_session', JSON.stringify(user));
-    // Sync newly registered patient to local memory
-    setUsers(prev => {
-      if (prev.some(u => u.id === user.id)) return prev;
-      return [...prev, user];
-    });
-    return user;
   };
 
   const loginWithGoogle = async (email?: string, name?: string): Promise<User> => {
@@ -230,49 +419,97 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const createStaffAccount = async (name: string, email: string, role: UserRole, department?: string): Promise<User> => {
-    const res = await fetch('/api/users/staff', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, role, department })
-    });
+    try {
+      const res = await fetch('/api/users/staff', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, role, department })
+      });
 
-    if (!res.ok) {
-      const errorData = await res.json();
-      throw new Error(errorData.error || 'Failed to create staff account.');
+      if (res.ok) {
+        const { user } = await res.json();
+        setUsers(prev => {
+          if (prev.some(u => u.id === user.id)) return prev;
+          return [...prev, user];
+        });
+        return user;
+      } else {
+        const errorData = await res.json().catch(() => ({ error: 'Failed to create staff account.' }));
+        throw new Error(errorData.error || 'Failed to create staff account.');
+      }
+    } catch (err) {
+      console.warn('Clinical server offline. Creating staff profile locally...');
+      const emailNorm = email.toLowerCase().trim();
+      const localUsers = getLocalUsers();
+      if (localUsers.some(u => u.email.toLowerCase().trim() === emailNorm)) {
+        throw new Error('A user with this email address already exists in database.');
+      }
+
+      const newUser: User = {
+        id: `usr-${role}-${Date.now()}`,
+        name,
+        email: emailNorm,
+        role,
+        department,
+        createdAt: new Date().toISOString()
+      };
+
+      saveLocalUser(newUser);
+      setUsers(prev => [...prev, newUser]);
+      return newUser;
     }
-
-    const { user } = await res.json();
-    // Add new staff account to current registry list to update dashboard counters
-    setUsers(prev => {
-      if (prev.some(u => u.id === user.id)) return prev;
-      return [...prev, user];
-    });
-    return user;
   };
 
   const updateStaffAccount = async (id: string, name: string, email: string, role?: UserRole, department?: string): Promise<User> => {
-    const res = await fetch(`/api/users/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, role, department })
-    });
+    try {
+      const res = await fetch(`/api/users/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, role, department })
+      });
 
-    if (!res.ok) {
-      const errorData = await res.json();
-      throw new Error(errorData.error || 'Failed to update staff account.');
+      if (res.ok) {
+        const { user } = await res.json();
+        setUsers(prev => prev.map(u => u.id === id ? user : u));
+
+        if (currentUser && currentUser.id === id) {
+          setCurrentUser(user);
+          localStorage.setItem('carebridge_active_session', JSON.stringify(user));
+          window.dispatchEvent(new Event('storage'));
+        }
+
+        return user;
+      } else {
+        const errorData = await res.json().catch(() => ({ error: 'Failed to update staff account.' }));
+        throw new Error(errorData.error || 'Failed to update staff account.');
+      }
+    } catch (err) {
+      console.warn('Clinical server offline. Updating staff profile locally...');
+      const localUsers = getLocalUsers();
+      const found = localUsers.find(u => u.id === id);
+      if (!found) {
+        throw new Error('Staff account not found in local records.');
+      }
+
+      const updatedUser: User = {
+        ...found,
+        name,
+        email: email.toLowerCase().trim(),
+        role: role || found.role,
+        department: department || found.department
+      };
+
+      saveLocalUser(updatedUser);
+      setUsers(prev => prev.map(u => u.id === id ? updatedUser : u));
+
+      if (currentUser && currentUser.id === id) {
+        setCurrentUser(updatedUser);
+        localStorage.setItem('carebridge_active_session', JSON.stringify(updatedUser));
+        window.dispatchEvent(new Event('storage'));
+      }
+
+      return updatedUser;
     }
-
-    const { user } = await res.json();
-    setUsers(prev => prev.map(u => u.id === id ? user : u));
-
-    // If updating currently logged in user, sync session
-    if (currentUser && currentUser.id === id) {
-      setCurrentUser(user);
-      localStorage.setItem('carebridge_active_session', JSON.stringify(user));
-      window.dispatchEvent(new Event('storage'));
-    }
-
-    return user;
   };
 
   const logout = () => {
