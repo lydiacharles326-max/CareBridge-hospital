@@ -1,7 +1,6 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
-import { createServer as createViteServer } from 'vite';
 import { getDb, getUsersCollection, getAppointmentsCollection } from './server_db/mongodb.js';
 
 // Global Console Interceptor for Vercel Log Visibility
@@ -80,7 +79,7 @@ async function seedDefaultUsers() {
     await usersColl.deleteMany({ 'user.email': 'doctor.sarah@carebridge.com' });
 
     const existing = await usersColl.find();
-    const existingEmails = new Set(existing.map((u: any) => u.user.email?.toLowerCase().trim()));
+    const existingEmails = new Set(existing.map((u: any) => u.user?.email?.toLowerCase().trim()).filter(Boolean));
 
     const defaultUsers = [
       // 1. Admin
@@ -818,6 +817,7 @@ async function startServer() {
   await seedDefaultUsers();
 
   if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa'
